@@ -8,9 +8,11 @@
 # SC1091: Not following: (file missing)
 # SC1117: Backslash is literal in "\n". Prefer explicit escaping: "\\n".
 # SC2059: Don't use variables in the printf format string. Use printf "..%s.." "$foo".
-shopt -s gnu_errfmt
+
 shopt -s nullglob
-shopt -s extglob
+# FIXME: not supported by gosu
+# shopt -s gnu_errfmt
+# shopt -s extglob
 
 # NOTE: don't touch the RHS, it gets replaced at runtime
 direnv="$(command -v direnv)"
@@ -348,7 +350,7 @@ source_env() {
     # shellcheck disable=SC1090
     . "./$rcpath_base"
   else
-    log_status "referenced $rcfile does not exist"
+    log_status "referenced './$rcpath_base' does not exist"
   fi
   popd >/dev/null || return 1
   popd >/dev/null || return 1
@@ -1305,26 +1307,13 @@ on_git_branch() {
   fi
 }
 
-# Usage: __main__ <cmd> [...<args>]
-#
-# Used by rc.go
-__main__() {
-  # reserve stdout for dumping
-  exec 3>&1
-  exec 1>&2
-
-  __dump_at_exit() {
-    local ret=$?
-    "$direnv" dump json "" >&3
-    trap - EXIT
-    exit "$ret"
-  }
-  trap __dump_at_exit EXIT
-
+_load_libraries() {
   # load direnv libraries
   for lib in "$direnv_config_dir/lib/"*.sh; do
-    # shellcheck disable=SC1090
-    source "$lib"
+    if [[ -f "$lib" ]]; then
+      # shellcheck disable=SC1090
+      source "$lib"
+    fi
   done
 
   # load the global ~/.direnvrc if present
@@ -1335,6 +1324,25 @@ __main__() {
     # shellcheck disable=SC1090,SC1091
     source "$HOME/.direnvrc" >&2
   fi
+}
+
+# Usage: __main__ <cmd> [...<args>]
+#
+# Used by rc.go
+__main__() {
+  # reserve stdout for dumping
+  # exec 3>&1
+  # exec 1>&2
+
+  # __dump_at_exit() {
+  #   local ret=$?
+  #   "$direnv" dump json "" >&3
+  #   trap - EXIT
+  #   exit "$ret"
+  # }
+  # trap __dump_at_exit EXIT
+
+  _load_libraries
 
   # and finally load the .envrc
   "$@"
